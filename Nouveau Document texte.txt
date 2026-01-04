@@ -1,0 +1,151 @@
+-- Création de la base de données si elle n'existe pas
+CREATE DATABASE IF NOT EXISTS mvc_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE mvc_db;
+
+-- Table des utilisateurs (déjà créée)
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    discord_tag VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role ENUM('user', 'admin', 'booster') DEFAULT 'user',
+    balance DECIMAL(10, 2) DEFAULT 0.00
+) ENGINE=InnoDB;
+
+-- Table des catégories de services
+CREATE TABLE IF NOT EXISTS categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Table des services (anciennement produits)
+CREATE TABLE IF NOT EXISTS services (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    estimated_time VARCHAR(100),  -- Temps estimé pour le service
+    is_available BOOLEAN DEFAULT TRUE,
+    image_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Table des options de service (ex: rang actuel, rang souhaité, etc.)
+CREATE TABLE IF NOT EXISTS service_options (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    price_multiplier DECIMAL(5, 2) DEFAULT 1.00,
+    is_required BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Table des commandes
+CREATE TABLE IF NOT EXISTS orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    order_number VARCHAR(50) UNIQUE NOT NULL,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status ENUM('pending', 'in_progress', 'completed', 'cancelled', 'disputed') DEFAULT 'pending',
+    discord_tag VARCHAR(100) NOT NULL,  -- Tag Discord du client
+    game_username VARCHAR(100),  -- Pseudo en jeu
+    server_region VARCHAR(50),   -- Serveur/Région
+    additional_notes TEXT,       -- Instructions supplémentaires
+    admin_notes TEXT,            -- Notes internes pour l'admin/booster
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Table des détails de commande
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    service_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DECIMAL(10, 2) NOT NULL,
+    selected_options JSON,  -- Stocke les options sélectionnées au format JSON
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES services(id)
+) ENGINE=InnoDB;
+
+-- Table des paiements
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    user_id INT NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_method ENUM('paypal', 'stripe', 'crypto', 'balance') NOT NULL,
+    transaction_id VARCHAR(100),
+    status ENUM('pending', 'completed', 'failed', 'refunded') DEFAULT 'pending',
+    payment_details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- Table des notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    type ENUM('order_update', 'payment', 'support', 'system') NOT NULL,
+    related_id INT,  -- Peut être l'ID d'une commande, d'un paiement, etc.
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Table des transactions de portefeuille
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    amount DECYoutubeMAL(10, 2) NOT NULL,
+    type ENUM('deposit', 'withdrawal', 'order_payment', 'refund', 'bonus') NOT NULL,
+    status ENUM('pending', 'completed', 'failed', 'cancelled') DEFAULT 'pending',
+    payment_method VARCHAR(50),
+    transaction_id VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Insertion de données de test
+-- Catégories
+INSERT INTO categories (name, description, icon) VALUES 
+('Boosting', 'Services de boosting de compte', 'fa-arrow-up'),
+('Coaching', 'Cours particuliers avec des joueurs professionnels', 'fa-graduation-cap'),
+('Placement', 'Services de placement en ranked', 'fa-trophy');
+
+-- Services
+INSERT INTO services (category_id, name, description, price, estimated_time) VALUES 
+(1, 'Boosting Solo/Duo', 'Boosting en Solo/Duo jusqu\'au rang souhaité', 50.00, '1-3 jours'),
+(1, 'Boosting Flex', 'Boosting en Flex jusqu\'au rang souhaité', 45.00, '1-3 jours'),
+(2, 'Coaching 1h', 'Session de coaching personnalisée de 1h', 30.00, '1h'),
+(2, 'Coaching 5h', 'Forfait de 5h de coaching avec réduction', 125.00, '5h'),
+(3, 'Placement en Ranked', '10 parties de classées avec garantie de victoire', 100.00, '3-5 jours');
+
+-- Options de service
+INSERT INTO service_options (service_id, name, description, price_multiplier, is_required) VALUES
+(1, 'Division Actuelle', 'Votre division actuelle', 1.00, TRUE),
+(1, 'Division Cible', 'La division que vous souhaitez atteindre', 1.00, TRUE),
+(1, 'Priorité', 'Traitement prioritaire de votre commande', 1.50, FALSE),
+(2, 'Division Actuelle', 'Votre division actuelle', 1.00, TRUE),
+(2, 'Division Cible', 'La division que vous souhaitez atteindre', 1.00, TRUE);
+
