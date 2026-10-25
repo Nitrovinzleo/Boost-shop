@@ -194,19 +194,19 @@ export default function OrderChatModal({ isOpen, onClose, order }) {
                   className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-slate-300">
-                      {isMe ? 'Vous' : msg.sender?.name || 'Intervenant'}
+                    <span className={`font-semibold ${isAdmin ? 'text-amber-300 font-bold' : 'text-slate-300'}`}>
+                      {isMe ? (isAdmin ? 'Vous (Admin)' : 'Vous') : msg.sender?.name || (isAdmin ? 'Support Admin' : 'Intervenant')}
                     </span>
                     <span
-                      className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                      className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase ${
                         isAdmin
-                          ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30'
+                          ? 'bg-amber-400 text-slate-950 border border-amber-300 shadow-sm'
                           : isBooster
                           ? 'bg-rose-950/60 text-rose-300 border border-rose-500/30'
                           : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
                       }`}
                     >
-                      {msg.senderRole}
+                      {isAdmin ? '🛡️ ADMIN' : msg.senderRole}
                     </span>
                     <span className="text-[10px] text-slate-500">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -215,7 +215,10 @@ export default function OrderChatModal({ isOpen, onClose, order }) {
 
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs sm:text-sm leading-relaxed ${
-                      isMe
+                      isAdmin
+                        ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-slate-950 font-semibold shadow-lg shadow-amber-950/40 border border-yellow-200/80 ' +
+                          (isMe ? 'rounded-tr-xs' : 'rounded-tl-xs')
+                        : isMe
                         ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-tr-xs shadow-md shadow-rose-950/50'
                         : 'bg-[#1b1422] border border-rose-500/20 text-slate-200 rounded-tl-xs shadow-md'
                     }`}
