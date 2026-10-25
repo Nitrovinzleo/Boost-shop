@@ -134,6 +134,7 @@ router.patch('/progress/:id', async (req, res) => {
 // 5. Complete an order
 router.post('/complete/:id', async (req, res) => {
   try {
+    const { proofScreenshot } = req.body || {};
     const order = await prisma.order.findUnique({ where: { id: req.params.id } });
     if (!order || (order.boosterId !== req.user.id && req.user.role !== 'ADMIN')) {
       return res.status(403).json({ error: 'Non autorisé' });
@@ -150,6 +151,7 @@ router.post('/complete/:id', async (req, res) => {
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
+          proofScreenshot: proofScreenshot ? proofScreenshot.trim() : null,
         },
       }),
       prisma.user.update({

@@ -82,6 +82,13 @@ model Order {
   accountLogin    String?
   accountPassword String?
   
+  // Anti-Chargeback Legal & Proof Protection
+  waiverAccepted    Boolean   @default(true)
+  waiverAcceptedAt  DateTime? @default(now())
+  paymentMethod     String    @default("CARD_3DS") // CARD_3DS, PAYPAL_DIGITAL, CRYPTO
+  clientIp          String?   @default("127.0.0.1")
+  proofScreenshot   String?   // URL/Proof link uploaded when completing
+
   // Live Chat & Notes
   messages        ChatMessage[]
   clientNote      String?

@@ -188,4 +188,54 @@ router.post('/payouts/:id/process', async (req, res) => {
   }
 });
 
+// 7. Get full dispute package for PayPal / Stripe with legal text
+router.get('/orders/:id/dispute-package', async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        client: { select: { id: true, name: true, email: true, discordTag: true, createdAt: true } },
+        booster: { select: { id: true, name: true, email: true, discordTag: true } },
+        messages: {
+          select: { id: true, senderRole: true, content: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+
+    const paypalLegalDefense = `
+DOSSIER DE CONTESTATION LITIGE PAYPAL - BIEN NUMÉRIQUE LIVRÉ
+Référence Commande Severum : ${order.orderCode}
+Montant : ${order.totalPrice.toFixed(2)} EUR
+Date de commande : ${new Date(order.createdAt).toISOString()}
+Client : ${order.client?.name} (${order.client?.email})
+IP Client enregistrée : ${order.clientIp || '127.0.0.1'}
+Moyen de paiement : ${order.paymentMethod || 'PAYPAL_DIGITAL'}
+
+1. RENONCIATION LÉGALE AU DROIT DE RÉTRACTATION (Art. L. 221-28 1° & 13°) :
+Le client a expressément renoncé à son droit de rétractation lors de la validation du paiement le ${order.waiverAcceptedAt ? new Date(order.waiverAcceptedAt).toISOString() : new Date(order.createdAt).toISOString()} :
+"J'accepte que la prestation commence immédiatement et je renonce expressément à mon droit de rétractation de 14 jours (Article L. 221-28 du Code de la consommation)."
+
+2. PREUVE DE LIVRAISON DU BIEN NUMÉRIQUE :
+- Service commandé : Boosting League of Legends (${order.queue})
+- Palier de départ : ${order.currentTier} ${order.currentDivision || ''}
+- Palier cible livré : ${order.targetTier} ${order.targetDivision || ''}
+- Palier final atteint sur le compte : ${order.liveTier} ${order.liveDivision || ''} (${order.winsCount} victoires enregistrées)
+- Date d'achèvement de la prestation : ${order.completedAt ? new Date(order.completedAt).toISOString() : 'En cours / Livré'}
+${order.proofScreenshot ? `- Preuve de partie / Capture d'écran certifiée : ${order.proofScreenshot}` : ''}
+
+3. PREUVE D'ENGAGEMENT DIRECT ET MESSAGERIE :
+Le client a directement interagi avec le prestataire via notre messagerie chiffrée (${order.messages.length} messages échangés).
+La prestation de service immatériel a été intégralement honorée et personnalisée. Toute contestation pour "objet non reçu" ou "non autorisé" est infondée et frauduleuse.
+`.trim();
+
+    res.json({ order, paypalLegalDefense });
+  } catch (error) {
+    console.error('Dispute package error:', error);
+    res.status(500).json({ error: 'Erreur lors de la génération du dossier litige' });
+  }
+});
+
 export default router;

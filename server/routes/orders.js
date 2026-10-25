@@ -63,6 +63,8 @@ router.post('/', verifyToken, async (req, res) => {
       accountLogin,
       accountPassword,
       clientNote,
+      waiverAccepted = true,
+      paymentMethod = 'CARD_3DS',
     } = req.body;
 
     if (!currentTier || !targetTier || !totalPrice) {
@@ -72,6 +74,7 @@ router.post('/', verifyToken, async (req, res) => {
     const price = parseFloat(totalPrice);
     const boosterPayout = parseFloat((price * 0.7).toFixed(2));
     const severumFee = parseFloat((price * 0.3).toFixed(2));
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1').toString();
 
     let orderCode = generateOrderCode();
     let exists = await prisma.order.findUnique({ where: { orderCode } });
@@ -107,6 +110,10 @@ router.post('/', verifyToken, async (req, res) => {
         accountLogin,
         accountPassword,
         clientNote,
+        waiverAccepted: Boolean(waiverAccepted),
+        waiverAcceptedAt: new Date(),
+        paymentMethod,
+        clientIp,
       },
     });
 

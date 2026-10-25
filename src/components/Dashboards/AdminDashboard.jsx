@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   RefreshCw,
   Sparkles,
+  ShieldCheck,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import RankIcon from '../RankIcon';
@@ -31,6 +34,8 @@ export default function AdminDashboard() {
   const [inlineDrafts, setInlineDrafts] = useState({});
   const [savingReassign, setSavingReassign] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
+  const [disputePackageData, setDisputePackageData] = useState(null);
+  const [disputeCopied, setDisputeCopied] = useState(false);
 
   const fetchAdminData = async () => {
     if (!token) return;
@@ -132,6 +137,22 @@ export default function AdminDashboard() {
   };
 
   const boosters = users.filter((u) => u.role === 'BOOSTER' || u.role === 'ADMIN');
+
+  const handleOpenDisputePackage = async (orderId) => {
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/dispute-package`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDisputePackageData(data);
+      } else {
+        alert('Erreur lors de la récupération du dossier litige');
+      }
+    } catch (err) {
+      console.error('Error fetching dispute package:', err);
+    }
+  };
 
   return (
     <div className="w-full space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -339,6 +360,14 @@ export default function AdminDashboard() {
                         title="Ouvrir la liste de réassignation"
                       >
                         Réassigner
+                      </button>
+                      <button
+                        onClick={() => handleOpenDisputePackage(o.id)}
+                        className="px-2.5 py-1 rounded bg-amber-950/60 border border-amber-500/30 text-amber-300 hover:text-white hover:bg-amber-900/40 cursor-pointer"
+                        title="Dossier de preuve anti-chargeback (PayPal / Stripe)"
+                      >
+                        <ShieldCheck size={13} className="inline mr-1" />
+                        Dossier Litige
                       </button>
                     </td>
                   </tr>
@@ -587,6 +616,117 @@ export default function AdminDashboard() {
               >
                 <CheckCircle2 size={15} />
                 <span>{savingReassign ? 'Enregistrement...' : 'Sauvegarder'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Package Modal */}
+      {disputePackageData && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDisputePackageData(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overscroll-none"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="glass-card w-full max-w-2xl max-h-[85vh] rounded-2xl border border-amber-500/30 bg-[#120d15]/95 shadow-2xl p-6 flex flex-col space-y-4 -translate-y-4 sm:-translate-y-6 overflow-hidden"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-rose-900/30">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-500/40 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">
+                    Dossier Anti-Chargeback & Litige PayPal / Stripe
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Commande <span className="text-rose-400">{disputePackageData.order.orderCode}</span> • Client : {disputePackageData.order.client?.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDisputePackageData(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-rose-950/40 cursor-pointer"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs font-mono">
+              {/* Section 1: Preuve Légale de Renonciation */}
+              <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-1.5">
+                <span className="text-emerald-400 font-bold block text-[11px]">
+                  ✓ Renonciation au Droit de Rétractation (Art. L. 221-28)
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Case légale acceptée par le client le : <strong>{new Date(disputePackageData.order.waiverAcceptedAt || disputePackageData.order.createdAt).toLocaleString('fr-FR')}</strong>
+                </p>
+                <p className="text-slate-400 text-[10px]">
+                  IP Client : <strong className="text-white">{disputePackageData.order.clientIp || '127.0.0.1'}</strong> • Moyen : <strong className="text-amber-300">{disputePackageData.order.paymentMethod || 'PAYPAL_DIGITAL'}</strong>
+                </p>
+              </div>
+
+              {/* Section 2: Preuve d'Exécution & Rangs */}
+              <div className="p-3.5 rounded-xl bg-[#09060b] border border-rose-500/20 space-y-1.5">
+                <span className="text-white font-bold block text-[11px]">
+                  📦 Preuve de Livraison du Service Numérique
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-slate-300 text-[11px]">
+                  <div>Départ : <strong className="text-white">{disputePackageData.order.currentTier} {disputePackageData.order.currentDivision}</strong></div>
+                  <div>Cible Livrée : <strong className="text-emerald-400">{disputePackageData.order.liveTier} {disputePackageData.order.liveDivision}</strong></div>
+                  <div>Victoires : <strong className="text-emerald-400">+{disputePackageData.order.winsCount}V</strong></div>
+                  <div>Statut : <strong className="text-white">{disputePackageData.order.status}</strong></div>
+                </div>
+                {disputePackageData.order.proofScreenshot && (
+                  <div className="pt-1 text-[11px]">
+                    Lien de preuve certifié : <a href={disputePackageData.order.proofScreenshot} target="_blank" rel="noreferrer" className="text-rose-400 underline">{disputePackageData.order.proofScreenshot}</a>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Texte pré-rempli pour PayPal */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-slate-300 font-bold flex justify-between items-center">
+                  <span>Argumentaire Juridique Prêt à Soumettre (PayPal Resolution Center) :</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(disputePackageData.paypalLegalDefense);
+                      setDisputeCopied(true);
+                      setTimeout(() => setDisputeCopied(false), 2500);
+                    }}
+                    className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    {disputeCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    <span>{disputeCopied ? 'Copié !' : 'Copier'}</span>
+                  </button>
+                </label>
+                <textarea
+                  readOnly
+                  rows={6}
+                  value={disputePackageData.paypalLegalDefense}
+                  className="w-full bg-[#0a060d] border border-rose-500/30 rounded-xl p-3 text-[11px] text-slate-300 font-mono select-all focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-rose-900/30 text-xs font-mono">
+              <span className="text-slate-400 text-[10px]">Conforme Art. L. 221-28 Code de la consommation</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(disputePackageData.paypalLegalDefense);
+                  setDisputeCopied(true);
+                  setTimeout(() => setDisputeCopied(false), 2500);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-amber-950/50 cursor-pointer"
+              >
+                <Copy size={13} />
+                <span>{disputeCopied ? 'Copié pour PayPal !' : 'Copier Dossier PayPal'}</span>
               </button>
             </div>
           </div>

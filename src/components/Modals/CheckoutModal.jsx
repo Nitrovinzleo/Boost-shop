@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
-import { X, Lock, CheckCircle2, Mail, CreditCard, ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  X,
+  Lock,
+  CheckCircle2,
+  Mail,
+  CreditCard,
+  ArrowLeft,
+  ShieldCheck,
+  Sparkles,
+  ShieldAlert,
+  Copy,
+  Check,
+  Zap,
+} from 'lucide-react';
 import logoImg from '../../assets/logo-severum.png';
 import discordLogo from '../../assets/discord-logo.png';
 
@@ -10,6 +23,12 @@ export default function CheckoutModal({ isOpen, onClose, orderDetails = {} }) {
   const [password, setPassword] = useState('');
   const [discordUser, setDiscordUser] = useState('');
   const [resetSent, setResetSent] = useState(false);
+
+  // Anti-chargeback & Payment states
+  const [paymentMethod, setPaymentMethod] = useState('CARD_3DS'); // 'CARD_3DS', 'PAYPAL_DIGITAL', 'CRYPTO'
+  const [waiverAccepted, setWaiverAccepted] = useState(false);
+  const [cryptoCurrency, setCryptoCurrency] = useState('USDT_TRC20');
+  const [cryptoCopied, setCryptoCopied] = useState(false);
 
   // Payment mock states
   const [cardName, setCardName] = useState('');
@@ -25,6 +44,8 @@ export default function CheckoutModal({ isOpen, onClose, orderDetails = {} }) {
     setPassword('');
     setDiscordUser('');
     setResetSent(false);
+    setPaymentMethod('CARD_3DS');
+    setWaiverAccepted(false);
     setCardName('');
     setCardNumber('');
     setCardExpiry('');
@@ -75,6 +96,8 @@ export default function CheckoutModal({ isOpen, onClose, orderDetails = {} }) {
             favoriteChampions: Array.isArray(orderDetails.champions) ? orderDetails.champions.join(', ') : null,
             offlineMode: orderDetails.offlineMode !== false,
             totalPrice: orderPrice || 45.0,
+            paymentMethod,
+            waiverAccepted,
           }),
         });
         if (res.ok) {
@@ -302,93 +325,230 @@ export default function CheckoutModal({ isOpen, onClose, orderDetails = {} }) {
             </div>
           )}
 
-          {/* STEP 3: PAYMENT MOCK */}
+          {/* STEP 3: PAYMENT & ANTI-CHARGEBACK PROTECTION */}
           {step === 'payment' && (
             <div>
               <div className="text-center mb-4">
-                <h4 className="text-lg font-black text-white mb-0.5">Paiement Sécurisé</h4>
+                <h4 className="text-lg font-black text-white mb-0.5">Règlement Sécurisé & Garanti</h4>
                 <p className="text-xs text-slate-400">
-                  Règlement de votre commande : <span className="text-[#f43f5e] font-bold font-mono">${orderPrice.toFixed(2)}</span>
+                  Total de votre commande : <span className="text-[#f43f5e] font-bold font-mono">{orderPrice.toFixed(2)} €</span>
                 </p>
               </div>
 
               {/* Order Overview Mini Box */}
-              <div className="p-3.5 rounded-xl bg-[#0c0810] border border-[#e11d48]/15 mb-4 text-xs space-y-1">
+              <div className="p-3.5 rounded-xl bg-[#0c0810] border border-[#e11d48]/15 mb-4 text-xs space-y-1 font-mono">
                 <div className="flex justify-between text-slate-400">
                   <span>Service :</span>
                   <span className="font-semibold text-white uppercase">{orderDetails.boostType}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Serveur :</span>
-                  <span className="font-semibold text-white">{orderDetails.server}</span>
+                  <span className="font-semibold text-white">{orderDetails.server} ({orderDetails.queue})</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
-                  <span>File :</span>
-                  <span className="font-semibold text-white">{orderDetails.queue}</span>
+                  <span>Objectif :</span>
+                  <span className="font-semibold text-rose-400">
+                    {orderDetails.desiredTier || orderDetails.targetTier || 'Emerald'} {orderDetails.desiredDivision || orderDetails.targetDivision || 'IV'}
+                  </span>
                 </div>
               </div>
 
-              {/* Card Inputs */}
+              {/* Payment Method Selector Pills */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CARD_3DS')}
+                  className={`p-2.5 rounded-xl border text-[11px] font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    paymentMethod === 'CARD_3DS'
+                      ? 'bg-rose-950/80 border-rose-500 text-white shadow-md'
+                      : 'bg-[#0f0914] border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <CreditCard size={16} className={paymentMethod === 'CARD_3DS' ? 'text-rose-400' : ''} />
+                  <span>Carte 3DS</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('PAYPAL_DIGITAL')}
+                  className={`p-2.5 rounded-xl border text-[11px] font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    paymentMethod === 'PAYPAL_DIGITAL'
+                      ? 'bg-rose-950/80 border-rose-500 text-white shadow-md'
+                      : 'bg-[#0f0914] border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span className="font-black text-blue-400 text-xs">PayPal</span>
+                  <span>Business</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CRYPTO')}
+                  className={`p-2.5 rounded-xl border text-[11px] font-mono font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    paymentMethod === 'CRYPTO'
+                      ? 'bg-rose-950/80 border-rose-500 text-white shadow-md'
+                      : 'bg-[#0f0914] border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Zap size={16} className="text-amber-400" />
+                  <span className="text-amber-300">Crypto 0-Litige</span>
+                </button>
+              </div>
+
+              {/* Form by Method */}
               <form onSubmit={handlePaymentSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Titulaire de la carte
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                    placeholder="Jean Dupont"
-                    className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
-                  />
-                </div>
+                {/* 1. Carte Bancaire avec 3D Secure */}
+                {paymentMethod === 'CARD_3DS' && (
+                  <div className="space-y-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 flex items-center gap-2 font-mono">
+                      <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
+                      <span>3-D Secure 2.0 actif : authentification bancaire obligatoire (Protection anti-fraude & transfert de responsabilité).</span>
+                    </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Numéro de carte
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength="19"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="4000 1234 5678 9010"
-                    className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
-                  />
-                </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Titulaire de la carte
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value)}
+                        placeholder="Jean Dupont"
+                        className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      Expiration
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength="5"
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      placeholder="MM/AA"
-                      className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
-                    />
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        Numéro de carte
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength="19"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="4000 1234 5678 9010"
+                        className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          Expiration
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength="5"
+                          value={cardExpiry}
+                          onChange={(e) => setCardExpiry(e.target.value)}
+                          placeholder="MM/AA"
+                          className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          CVV
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          maxLength="4"
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value)}
+                          placeholder="•••"
+                          className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      CVV
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      maxLength="4"
-                      value={cardCvv}
-                      onChange={(e) => setCardCvv(e.target.value)}
-                      placeholder="•••"
-                      className="w-full bg-[#0d0912] border border-[#e11d48]/25 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#f43f5e]"
-                    />
+                )}
+
+                {/* 2. PayPal Business Bien Numérique */}
+                {paymentMethod === 'PAYPAL_DIGITAL' && (
+                  <div className="p-4 rounded-xl bg-[#09060b] border border-blue-500/30 space-y-3 font-mono">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                      <ShieldCheck size={16} />
+                      <span>PayPal Digital Goods & Services Certifié</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Prestation de service numérique personnalisée livrée sans expédition physique. Votre commande sera immédiatement transmise à nos boosters Challenger après validation.
+                    </p>
+                    <div className="p-2.5 rounded-lg bg-blue-950/40 border border-blue-500/20 text-[10px] text-blue-200">
+                      ✓ Facture nominative & justificatif d'exécution numérique délivrés automatiquement.
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* 3. Crypto 100% Irréversible (Zero chargeback) */}
+                {paymentMethod === 'CRYPTO' && (
+                  <div className="p-4 rounded-xl bg-[#0a0710] border border-amber-500/30 space-y-3 font-mono">
+                    <div className="flex items-center justify-between">
+                      <span className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
+                        <Zap size={14} />
+                        <span>Paiement Crypto Irréversible (0 Litige)</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-500/40 font-bold">
+                        Zéro Fraude
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] text-slate-400 block mb-1">Devise & Réseau :</label>
+                      <select
+                        value={cryptoCurrency}
+                        onChange={(e) => setCryptoCurrency(e.target.value)}
+                        className="w-full bg-[#120a18] border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-white"
+                      >
+                        <option value="USDT_TRC20">USDT (Tether - Réseau TRC-20)</option>
+                        <option value="USDT_POLYGON">USDT (Tether - Réseau Polygon / Frais &lt; 0.01$)</option>
+                        <option value="BTC">Bitcoin (BTC)</option>
+                        <option value="SOL">Solana (SOL)</option>
+                      </select>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#140c1d] border border-amber-500/20 text-xs space-y-1">
+                      <span className="text-slate-400 text-[10px] block">Adresse de dépôt sécurisée Severum :</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-amber-300 text-[11px] break-all select-all">
+                          {cryptoCurrency.includes('TRC20')
+                            ? 'TN7y8q9WzE1X9PqSeverumBoostOfficial77'
+                            : cryptoCurrency.includes('POLYGON')
+                            ? '0x71C...SeverumPolygonVault8821'
+                            : 'bc1q9severumchallengerboost99201'}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText('TN7y8q9WzE1X9PqSeverumBoostOfficial77');
+                            setCryptoCopied(true);
+                            setTimeout(() => setCryptoCopied(false), 2000);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-950/80 border border-amber-500/30 text-amber-300 text-[10px] font-bold shrink-0 hover:bg-amber-900 cursor-pointer"
+                        >
+                          {cryptoCopied ? 'Copié !' : 'Copier'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MANDATORY LEGAL WAIVER (Article L. 221-28 1° & 13°) */}
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-950/20 border border-rose-500/30 text-slate-300 text-[11px] leading-relaxed cursor-pointer select-none mt-2">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={waiverAccepted}
+                    onChange={(e) => setWaiverAccepted(e.target.checked)}
+                    className="mt-0.5 accent-rose-500 rounded cursor-pointer shrink-0"
+                  />
+                  <span>
+                    Je reconnais et accepte expressément que l'exécution de la prestation de boosting commence immédiatement après paiement et je <strong className="text-rose-400">renonce expressément à mon droit de rétractation de 14 jours</strong> conformément à l'article L. 221-28 du Code de la consommation.
+                  </span>
+                </label>
 
                 {/* Seals */}
                 <div className="flex justify-between items-center py-2 text-[10px] text-slate-400 border-t border-white/5 mt-2">
@@ -397,17 +557,22 @@ export default function CheckoutModal({ isOpen, onClose, orderDetails = {} }) {
                     Chiffrement SSL 256-bit
                   </span>
                   <div className="flex gap-1.5 font-mono font-bold text-[9px]">
-                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">VISA</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">Mastercard</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">PayPal</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">3DS v2</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">PayPal Business</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">USDT / Web3</span>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full min-h-[46px] py-3 rounded-xl bg-gradient-to-r from-[#e11d48] to-[#be123c] text-white text-xs font-extrabold uppercase tracking-wider shadow-[0_6px_20px_rgba(225,29,72,0.4)] hover:shadow-[0_8px_25px_rgba(225,29,72,0.6)] hover:-translate-y-0.5 transition-all cursor-pointer mt-3"
+                  disabled={!waiverAccepted}
+                  className="w-full min-h-[46px] py-3 rounded-xl bg-gradient-to-r from-[#e11d48] to-[#be123c] text-white text-xs font-extrabold uppercase tracking-wider shadow-[0_6px_20px_rgba(225,29,72,0.4)] hover:shadow-[0_8px_25px_rgba(225,29,72,0.6)] hover:-translate-y-0.5 transition-all cursor-pointer mt-3 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Régler ${orderPrice.toFixed(2)} en toute sécurité
+                  {paymentMethod === 'PAYPAL_DIGITAL'
+                    ? `Payer ${orderPrice.toFixed(2)} € via PayPal Business`
+                    : paymentMethod === 'CRYPTO'
+                    ? `Confirmer le règlement Crypto (${orderPrice.toFixed(2)} €)`
+                    : `Régler ${orderPrice.toFixed(2)} € (3D Secure Garanti)`}
                 </button>
               </form>
             </div>
