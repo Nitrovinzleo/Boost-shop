@@ -1,0 +1,115 @@
+// Prisma Schema for Severum Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?   @default("Invocateur")
+  role         String    @default("CLIENT") // CLIENT | BOOSTER | ADMIN
+  discordTag   String?
+  avatarUrl    String?
+  
+  // Booster specific fields
+  boosterPeakRank    String?  // Master, Grandmaster, Challenger
+  boosterMainRole    String?  // Jungle, Top, Mid, ADC, Support
+  boosterBalance     Float    @default(0.0) // Pending or available balance in €
+  boosterTotalEarned Float    @default(0.0)
+  boosterIsApproved  Boolean  @default(false)
+  boosterIsOnline    Boolean  @default(false)
+  
+  // Relations
+  clientOrders   Order[]        @relation("ClientOrders")
+  boosterOrders  Order[]        @relation("BoosterOrders")
+  sentMessages   ChatMessage[]  @relation("SentMessages")
+  payouts        Payout[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  orderCode   String   @unique // ex: SV-8492
+  status      String   @default("PENDING_CLAIM") // PENDING_CLAIM, IN_PROGRESS, PAUSED, COMPLETED, CANCELLED
+  
+  // Relations
+  clientId    String
+  client      User     @relation("ClientOrders", fields: [clientId], references: [id])
+  boosterId   String?
+  booster     User?    @relation("BoosterOrders", fields: [boosterId], references: [id])
+  
+  // Configuration
+  boostType       String   @default("division") // division, netwins, placements, coaching, antidecay
+  server          String   @default("EUW")
+  queue           String   @default("Solo/Duo (5v5)")
+  currentTier     String   // Iron ... Challenger
+  currentDivision String?  // IV ... I
+  currentLp       Int      @default(0)
+  targetTier      String
+  targetDivision  String?
+  targetLp        Int      @default(0)
+  
+  // Real-time progress tracked by booster
+  liveTier        String
+  liveDivision    String?
+  liveLp          Int      @default(0)
+  winsCount       Int      @default(0)
+  lossesCount     Int      @default(0)
+  
+  // Preferences & Security
+  flashKey           String?  @default("D") // D or F
+  favoriteRoles      String?  // JSON string or comma-separated
+  favoriteChampions  String?
+  offlineMode        Boolean  @default(true)
+  duoBoost           Boolean  @default(false)
+  priorityOrder      Boolean  @default(false)
+  
+  // Financial
+  totalPrice      Float
+  boosterPayout   Float
+  severumFee      Float
+  isPaid          Boolean  @default(true)
+  
+  // LoL Encrypted Credentials
+  accountLogin    String?
+  accountPassword String?
+  
+  // Live Chat & Notes
+  messages        ChatMessage[]
+  clientNote      String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  senderRole String  // CLIENT, BOOSTER, ADMIN
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Payout {
+  id          String   @id @default(uuid())
+  boosterId   String
+  booster     User     @relation(fields: [boosterId], references: [id])
+  amount      Float
+  method      String   // PAYPAL, SEPA, CRYPTO
+  destination String   // Email or IBAN or Wallet address
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  requestedAt DateTime @default(now())
+  processedAt DateTime?
+}
